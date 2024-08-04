@@ -1,0 +1,43 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# Determine host adpater for bridging in BRIDGE mode
+def get_bridge_adapter()
+  return %x{ip route | grep default | head -n 1 | awk '{ print $5 }'}.chomp
+end
+
+Vagrant.configure("2") do |config|
+  # The most common configuration options are documented and commented below.
+  # For a complete reference, please see the online documentation at
+  # https://docs.vagrantup.com.
+
+  config.vm.box = "debian/bookworm64"
+  config.vm.box_check_update = false
+  config.vm.network :public_network, bridge: get_bridge_adapter(), ip: ENV['TRITON_IP']
+  config.vm.network "forwarded_port", guest: 2377, host: 2377
+  config.vm.network "forwarded_port", guest: 7946, host: 7946
+  config.vm.network "forwarded_port", guest: 4789, host: 4789, protocol: "udp"
+
+  config.vm.synced_folder "/mnt/nas/media/", "/mnt/jellyfin/media"
+  config.vm.define "triton" do |node|  # the string provided here appears in vagrant status
+    node.vm.hostname = "triton"  # This appears in your router's host listing, and in the VM itself
+
+    # Provider-specific configuration so you can fine-tune various
+    # backing providers for Vagrant. These expose provider-specific options.
+    node.vm.provider "virtualbox" do |vb|
+      vb.name = "triton"  # This appears in the VirtualBox UI
+      vb.memory = "2048"
+      vb.cpus = 1
+    end
+  end
+
+  # Enable provisioning with a shell script. Additional provisioners such as
+  # Ansible, Chef, Docker, Puppet and Salt are also available. Please see the
+  # documentation for more information about their specific syntax and use.
+  config.vm.provision "shell", inline: <<-SHELL
+    apt-get update
+    apt-get install -y build-essential tree bat git curl htop
+
+    su - vagrant -c "git clone https://github.com/santosh/.dotfiles.git && cd .dotfiles && make install"
+  SHELL
+end

@@ -1,0 +1,42 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# Determine host adpater for bridging in BRIDGE mode
+def get_bridge_adapter()
+  return %x{ip route | grep default | head -n 1 | awk '{ print $5 }'}.chomp
+end
+
+Vagrant.configure("2") do |config|
+  # The most common configuration options are documented and commented below.
+  # For a complete reference, please see the online documentation at
+  # https://docs.vagrantup.com.
+
+  config.vm.box = "debian/bookworm64"
+  config.vm.box_check_update = false
+  config.vm.network :public_network, bridge: get_bridge_adapter(), ip: ENV['PROTEUS_IP']
+  config.vm.network "forwarded_port", guest: 8001, host: 8001
+  config.vm.network "forwarded_port", guest: 8443, host: 8443
+  config.vm.network "forwarded_port", guest: 10443, host: 10443
+  config.vm.synced_folder ".", "/vagrant"
+  config.vm.define "proteus" do |node|  # the string provided here appears in vagrant status
+    node.vm.hostname = "proteus"  # This appears in your router's host listing, and in the VM itself
+
+    # Provider-specific configuration so you can fine-tune various
+    # backing providers for Vagrant. These expose provider-specific options.
+    node.vm.provider "virtualbox" do |vb|
+      vb.name = "proteus"  # This appears in the VirtualBox UI
+      vb.memory = "2048"
+      vb.cpus = 1
+    end
+  end
+
+  # Enable provisioning with a shell script. Additional provisioners such as
+  # Ansible, Chef, Docker, Puppet and Salt are also available. Please see the
+  # documentation for more information about their specific syntax and use.
+  config.vm.provision "shell", inline: <<-SHELL
+    apt-get update
+    apt-get install -y build-essential tree bat git curl
+
+    su - vagrant -c "git clone https://github.com/santosh/.dotfiles.git && cd .dotfiles && make install"
+  SHELL
+end

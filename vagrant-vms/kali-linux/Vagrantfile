@@ -1,0 +1,28 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# Determine host adpater for bridging in BRIDGE mode
+def get_bridge_adapter()
+  return %x{ip route | grep default | head -n 1 | awk '{ print $5 }'}.chomp
+end
+
+Vagrant.configure("2") do |config|
+  # The most common configuration options are documented and commented below.
+  # For a complete reference, please see the online documentation at
+  # https://docs.vagrantup.com.
+
+  config.vm.box = "kalilinux/rolling"
+  config.vm.box_check_update = false
+  config.vm.network :public_network, bridge: get_bridge_adapter(), ip: ENV['KALI_IP']
+  config.vm.define "kali" do |node|  # the string provided here appears in vagrant status
+    node.vm.hostname = "kali"  # This appears in your router's host listing, and in the VM itself
+
+    # Provider-specific configuration so you can fine-tune various
+    # backing providers for Vagrant. These expose provider-specific options.
+    node.vm.provider "virtualbox" do |vb|
+      vb.name = "kali"  # This appears in the VirtualBox UI
+      vb.memory = "4096"
+      vb.cpus = 2
+    end
+  end
+end
